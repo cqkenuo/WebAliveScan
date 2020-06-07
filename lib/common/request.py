@@ -20,7 +20,6 @@ class Request:
         self.output.config(config.threads, self.total)
         self.output.target(target)
         self.index = 0
-        self.alive_web = []
         self.alive_path = config.result_save_path.joinpath('%s_alive_results.csv' % str(time.time()).split('.')[0])
         self.brute_path = config.result_save_path.joinpath('%s_brute_results.csv' % str(time.time()).split('.')[0])
         self.alive_result_list = []
@@ -35,9 +34,10 @@ class Request:
             url = f'https://{domain}'
             return url
         else:
+            url = []
             for protocol in protocols:
-                url = f'{protocol}{domain}:{port}'
-                return url
+                url.append(f'{protocol}{domain}:{port}')
+            return url
 
     def gen_url_list(self, target, port):
         try:
@@ -66,10 +66,19 @@ class Request:
                 domain = domain.strip()
                 if ':' in domain:
                     domain, port = domain.split(':')
-                    url_list.append(self.gen_url_by_port(domain, int(port)))
-                    continue
-                for port in ports:
-                    url_list.append(self.gen_url_by_port(domain, port))
+                    url = self.gen_url_by_port(domain, int(port))
+                    if isinstance(url, list):
+                        url_list = url_list + url
+                    else:
+                        url_list.append(url)
+                else:
+                    for port in ports:
+                        url = self.gen_url_by_port(domain, int(port))
+                        if isinstance(url, list):
+                            url_list += url
+                        else:
+                            url_list.append(url)
+                    
             return url_list
         except FileNotFoundError as e:
             self.output.debug(e)
@@ -86,8 +95,7 @@ class Request:
             if status in config.ignore_status_code:
                 raise Exception
             self.output.statusReport(url, status, size, title)
-            result = [title, url, status, size, None]
-            self.alive_web.append(url)
+            result = [title, url, str(status), size, '']
             self.alive_result_list.append(result)
             return r, text
         except Exception as e:
